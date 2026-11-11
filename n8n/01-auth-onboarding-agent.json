@@ -1,0 +1,390 @@
+{
+  "name": "01-auth-onboarding-agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "fitwave-auth",
+        "responseMode": "responseNode",
+        "options": { "allowedOrigins": "*" }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [32, 32],
+      "id": "b75cbf57-3fa3-4c98-b7d8-0627f4432a39",
+      "name": "Webhook",
+      "webhookId": "57b124fc-09f1-4140-9c8c-31df5d7f0261"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+                "conditions": [
+                  {
+                    "id": "e71372a9-9314-4924-b4fb-163e67ba5700",
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "register",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Register"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+                "conditions": [
+                  {
+                    "id": "24a15c01-3949-494f-bdb5-7b8353d61f04",
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "login",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Login"
+            }
+          ]
+        },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [256, 16],
+      "id": "e697cddd-0065-4ceb-8d5d-2b82cd6d2551",
+      "name": "Route Action"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body ?? {};\n\nconst action = typeof body.action === 'string' ? body.action.trim() : '';\nconst fullName = typeof body.full_name === 'string' ? body.full_name.trim() : '';\nconst email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';\nconst password = typeof body.password === 'string' ? body.password : '';\n\nconst errors = [];\n\nif (action !== 'register') errors.push('Invalid action.');\nif (fullName.length < 2 || fullName.length > 100) errors.push('Full name must be between 2 and 100 characters.');\nif (email.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) errors.push('A valid email address is required.');\nif (password.length < 12 || password.length > 128) errors.push('Password must be between 12 and 128 characters.');\n\nreturn [{ json: { valid: errors.length === 0, errors, action, full_name: fullName, email } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [528, -208],
+      "id": "0ae99055-c158-4479-aeee-3ba748fed497",
+      "name": "Validate Registration"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "f6aa75f3-b618-4b81-aee9-e0e4f7a77b67",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [720, -304],
+      "id": "3b8125ca-a9d7-4bd7-8086-0fee254925eb",
+      "name": "Registration Valid?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://suhqktpzwmcjzeeriehz.supabase.co/auth/v1/signup",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  email: $json.email,\n  password: $('Webhook').first().json.body.password,\n  data: {\n    full_name: $json.full_name\n  }\n} }}",
+        "options": {
+          "response": { "response": { "fullResponse": true, "neverError": true, "responseFormat": "json" } }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [944, -400],
+      "id": "46eb2fab-720e-47c2-8a36-313193cf02f8",
+      "name": "Supabase Sign Up",
+      "credentials": { "httpHeaderAuth": { "id": "ONe0NNkc3txurvq9", "name": "Header Auth account" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  success: $json.statusCode >= 200 && $json.statusCode < 300,\n  message: ($json.statusCode >= 200 && $json.statusCode < 300)\n    ? 'Registration request accepted. Check your email if confirmation is required.'\n    : 'Registration could not be completed.',\n  error_code: $json.body?.error_code ?? null\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1168, -400],
+      "id": "673c040f-878e-4d82-ad47-bafecc445bbf",
+      "name": "Registration Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, message: 'Please correct the registration data.', errors: $json.errors } }}",
+        "options": { "responseCode": 400 }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [944, -224],
+      "id": "c09a8874-01d8-468b-b57b-34b0d39bdd57",
+      "name": "Invalid Registration Data"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"message\": \"Invalid action. Use register or login.\"\n}",
+        "options": { "responseCode": 400 }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [512, 272],
+      "id": "5a4dc8fa-054f-4fa6-b78f-5cdcd2420cda",
+      "name": "Invalid Action Response"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body ?? {};\nconst errors = [];\n\nconst email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';\nconst password = typeof body.password === 'string' ? body.password : '';\n\nif (email.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) errors.push('A valid email address is required.');\nif (password.length === 0) errors.push('Password is required.');\n\nreturn [{ json: { valid: errors.length === 0, errors, email } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [512, 16],
+      "id": "3f48de4e-bd08-412c-8fcd-fc8e778c177a",
+      "name": "Validate Login"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "bb915462-397d-491a-bed3-68dfe8653842",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [704, 16],
+      "id": "d479275f-9729-4a38-97cb-a2b3debde8ec",
+      "name": "Login Valid?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, message: 'Please correct the login data.', errors: $json.errors } }}",
+        "options": { "responseCode": 400 }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [912, 128],
+      "id": "8460166d-d1a2-4a77-b426-94265b9b0760",
+      "name": "Invalid Login Data"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://suhqktpzwmcjzeeriehz.supabase.co/auth/v1/token?grant_type=password",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  email: $json.email,\n  password: $('Webhook').first().json.body.password\n} }}",
+        "options": {
+          "response": { "response": { "fullResponse": true, "neverError": true, "responseFormat": "json" } }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [912, -48],
+      "id": "c0f8c6f0-a8d1-4e8c-9d94-577aea7d52e1",
+      "name": "Supabase Login",
+      "credentials": { "httpHeaderAuth": { "id": "ONe0NNkc3txurvq9", "name": "Header Auth account" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "26ea736f-558a-48d1-aa32-931489da6548",
+              "leftValue": "={{ $json.statusCode === 200 && typeof $json.body?.access_token === 'string' && $json.body.access_token.length > 0 && typeof $json.body?.user?.id === 'string' }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1136, -48],
+      "id": "378693a6-b4bb-4a77-8c72-a76af469ee2f",
+      "name": "Login Successful?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"message\": \"Unable to sign in. Check your email and password, and confirm your email if required.\"\n}",
+        "options": { "responseCode": 401 }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1360, 96],
+      "id": "ac0df97c-5b06-4e9b-9562-7679867e3e56",
+      "name": "Login Failed Response"
+    },
+    {
+      "parameters": {
+        "url": "https://suhqktpzwmcjzeeriehz.supabase.co/rest/v1/members",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "select", "value": "id,email,full_name,age,height_cm,weight_kg,bmi,goal,experience_level,injuries,diet_preference,subscriptions(id,plan_type,start_date,end_date,status)" },
+            { "name": "id", "value": "={{ 'eq.' + $('Supabase Login').first().json.body.user.id }}" },
+            { "name": "limit", "value": "1" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $('Supabase Login').first().json.body.access_token }}" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "fullResponse": true, "neverError": true, "responseFormat": "json" } }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1360, -144],
+      "id": "1bf71518-5d64-4b60-8549-f018f33d1749",
+      "name": "Get Member Profile",
+      "credentials": { "httpHeaderAuth": { "id": "ONe0NNkc3txurvq9", "name": "Header Auth account" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "25e9d3c4-eee6-4702-9e67-acf9de78e970",
+              "leftValue": "={{ $json.statusCode === 200 && Array.isArray($json.body) && $json.body.length === 1 }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1584, -144],
+      "id": "455b56f5-5a34-46f8-a553-626205be6724",
+      "name": "Profile Found?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"message\": \"Unable to load your member profile.\"\n}",
+        "options": { "responseCode": 500 }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1808, -16],
+      "id": "4e7d3fa5-9cdc-4431-8291-ef73322969ba",
+      "name": "Profile Load Failed"
+    },
+    {
+      "parameters": {
+        "jsCode": "const member = $input.first().json.body[0];\nconst login = $('Supabase Login').first().json.body;\n\nconst subscriptions = Array.isArray(member.subscriptions) ? member.subscriptions : [];\n\n// UTC dates, end date is exclusive\nconst today = new Date().toISOString().slice(0, 10);\n\nconst activeSubscription = subscriptions.find((s) =>\n  s.status === 'active' && s.start_date <= today && s.end_date > today\n) ?? null;\n\nconst requiredFields = ['age', 'height_cm', 'weight_kg', 'goal', 'experience_level'];\nconst missingFields = requiredFields.filter((f) =>\n  member[f] === null || member[f] === undefined || member[f] === ''\n);\n\nconst { subscriptions: _history, ...profile } = member;\n\nreturn [{\n  json: {\n    success: true,\n    message: 'Signed in successfully.',\n    session: {\n      access_token: login.access_token,\n      expires_at: login.expires_at ?? Math.floor(Date.now() / 1000) + (login.expires_in ?? 3600)\n    },\n    profile,\n    profile_complete: missingFields.length === 0,\n    missing_fields: missingFields,\n    membership: {\n      has_active_subscription: activeSubscription !== null,\n      subscription: activeSubscription\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1808, -240],
+      "id": "bb0366dd-68c0-4b7c-8b08-ee7587d176a7",
+      "name": "Build Login Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": { "entries": [{ "name": "Cache-Control", "value": "no-store" }] }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2032, -240],
+      "id": "86b35056-24b3-45f9-8018-e4f740ad5897",
+      "name": "Login Response"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Route Action", "type": "main", "index": 0 }]] },
+    "Route Action": {
+      "main": [
+        [{ "node": "Validate Registration", "type": "main", "index": 0 }],
+        [{ "node": "Validate Login", "type": "main", "index": 0 }],
+        [{ "node": "Invalid Action Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Validate Registration": { "main": [[{ "node": "Registration Valid?", "type": "main", "index": 0 }]] },
+    "Registration Valid?": {
+      "main": [
+        [{ "node": "Supabase Sign Up", "type": "main", "index": 0 }],
+        [{ "node": "Invalid Registration Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Supabase Sign Up": { "main": [[{ "node": "Registration Response", "type": "main", "index": 0 }]] },
+    "Validate Login": { "main": [[{ "node": "Login Valid?", "type": "main", "index": 0 }]] },
+    "Login Valid?": {
+      "main": [
+        [{ "node": "Supabase Login", "type": "main", "index": 0 }],
+        [{ "node": "Invalid Login Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Supabase Login": { "main": [[{ "node": "Login Successful?", "type": "main", "index": 0 }]] },
+    "Login Successful?": {
+      "main": [
+        [{ "node": "Get Member Profile", "type": "main", "index": 0 }],
+        [{ "node": "Login Failed Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Member Profile": { "main": [[{ "node": "Profile Found?", "type": "main", "index": 0 }]] },
+    "Profile Found?": {
+      "main": [
+        [{ "node": "Build Login Response", "type": "main", "index": 0 }],
+        [{ "node": "Profile Load Failed", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Login Response": { "main": [[{ "node": "Login Response", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

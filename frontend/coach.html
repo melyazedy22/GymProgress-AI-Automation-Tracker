@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FitWave · AI Coach</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="coach.html">Fit<span>Wave</span></a>
+    <nav class="nav">
+      <span id="topbar-user" class="user-chip"></span>
+      <a href="profile.html" data-nav="profile">Profile</a>
+      <a href="coach.html" data-nav="coach">AI Coach</a>
+      <button id="logout-btn" class="btn btn-ghost" type="button">Log out</button>
+    </nav>
+  </header>
+
+  <main class="container stack">
+    <div class="card banner">
+      <div>
+        <h2>AI Coach</h2>
+        <p class="muted" id="membership"></p>
+      </div>
+      <div class="section-tabs">
+        <button class="btn" type="button" data-section="new">New plan</button>
+        <button class="btn btn-ghost" type="button" data-section="history">My plans</button>
+      </div>
+    </div>
+
+    <div id="page-msg" class="alert" hidden></div>
+
+    <section id="new-section" class="stack">
+      <form id="coach-form" class="card">
+        <h3>What do you need?</h3>
+        <div class="field">
+          <label>Plan type</label>
+          <div class="choice-group">
+            <label class="choice"><input type="radio" name="plan_type" value="both" checked><span>Workout + meals</span></label>
+            <label class="choice"><input type="radio" name="plan_type" value="workout"><span>Workout only</span></label>
+            <label class="choice"><input type="radio" name="plan_type" value="meal"><span>Meals only</span></label>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="days">Training days / week</label>
+            <select id="days" name="days_per_week">
+              <option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="minutes">Session length</label>
+            <select id="minutes" name="session_minutes">
+              <option value="30">30 min</option><option value="45" selected>45 min</option>
+              <option value="60">60 min</option><option value="90">90 min</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="equipment">Equipment</label>
+            <select id="equipment" name="equipment">
+              <option value="full_gym" selected>Full gym</option>
+              <option value="dumbbells">Dumbbells at home</option>
+              <option value="none">No equipment</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label class="check"><input type="checkbox" name="include_nutrition" checked> Include an approximate calorie &amp; macro estimate</label>
+        </div>
+        <div class="field">
+          <label for="notes">Notes for the coach <span class="muted">(optional)</span></label>
+          <textarea id="notes" name="notes" maxlength="500" dir="auto" placeholder="e.g. I train after work, I don't like fish, more focus on legs"></textarea>
+        </div>
+        <button class="btn btn-block" type="submit">Generate my plan</button>
+        <p class="hint">Takes about 20–60 seconds. General guidance only, not medical advice.</p>
+      </form>
+
+      <div id="result" class="card"><p class="muted">Your plan will appear here.</p></div>
+    </section>
+
+    <section id="history-section" class="card" hidden>
+      <div class="banner">
+        <h3>Saved plans</h3>
+        <button class="btn btn-ghost" id="reload-history" type="button">Refresh</button>
+      </div>
+      <div id="history-list"><p class="muted">Loading…</p></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    const session = FW.requireSession();
+    FW.renderTopbar('coach');
+    const { el } = FW;
+    const msg = document.getElementById('page-msg');
+    const result = document.getElementById('result');
+    const list = document.getElementById('history-list');
+    document.getElementById('membership').textContent = FW.membershipText(session.membership);
+
+    if (session.profile_complete === false) {
+      FW.showMessage(msg, el('span', {}, 'Complete your profile first so the coach can personalise your plan. ', el('a', { href: 'profile.html' }, 'Open profile →')), 'warn');
+    }
+
+    // ---------- renderers (AI text is inserted as text only) ----------
+    const stat = (label, value, unit) => el('div', { class: 'stat' }, el('b', {}, value ?? '–'), el('small', {}, unit ? `${label} (${unit})` : label));
+
+    function renderEstimate(e) {
+      return el('div', { class: 'stack' },
+        el('h4', {}, 'Approximate daily nutrition'),
+        el('div', { class: 'stats' },
+          stat('Calories', e.calories_per_day, 'kcal'), stat('Protein', e.protein_g, 'g'),
+          stat('Carbs', e.carbs_g, 'g'), stat('Fat', e.fat_g, 'g')),
+        e.note ? el('p', { class: 'hint' }, e.note) : null);
+    }
+
+    function renderWorkout(p) {
+      const wrap = el('div', { class: 'plan' }, el('h3', {}, '🏋️ ' + (p.title || 'Workout plan')));
+      const meta = [p.days_per_week && `${p.days_per_week} days/week`, p.session_minutes && `${p.session_minutes} min/session`].filter(Boolean).join(' · ');
+      if (meta) wrap.append(el('p', { class: 'muted' }, meta));
+      (p.days || []).forEach((d, i) => {
+        const rows = (d.exercises || []).map(x => el('tr', {},
+          el('td', {}, x.name || ''), el('td', {}, x.sets ?? ''), el('td', {}, x.reps ?? ''),
+          el('td', {}, x.rest_seconds ? x.rest_seconds + 's' : ''), el('td', { class: 'muted' }, x.notes || '')));
+        wrap.append(el('details', { class: 'day', open: i === 0 },
+          el('summary', {}, `${d.day || 'Day ' + (i + 1)}${d.focus ? ' — ' + d.focus : ''}`),
+          d.warm_up ? el('p', {}, el('strong', {}, 'Warm-up: '), d.warm_up) : null,
+          el('div', { class: 'table-wrap' },
+            el('table', {},
+              el('thead', {}, el('tr', {}, ['Exercise', 'Sets', 'Reps', 'Rest', 'Notes'].map(h => el('th', {}, h)))),
+              el('tbody', {}, rows))),
+          d.cool_down ? el('p', {}, el('strong', {}, 'Cool-down: '), d.cool_down) : null));
+      });
+      if (p.progression) wrap.append(el('p', {}, el('strong', {}, 'Progression: '), p.progression));
+      if (p.safety_notes && p.safety_notes.length) {
+        wrap.append(el('div', { class: 'notes' }, el('strong', {}, 'Safety notes'), el('ul', {}, p.safety_notes.map(n => el('li', {}, n)))));
+      }
+      return wrap;
+    }
+
+    function renderMeal(p, est) {
+      const wrap = el('div', { class: 'plan' }, el('h3', {}, '🥗 ' + (p.title || 'Meal plan')));
+      if (est) wrap.append(renderEstimate(est));
+      (p.days || []).forEach((d, i) => {
+        wrap.append(el('details', { class: 'day', open: i === 0 },
+          el('summary', {}, d.day || 'Day ' + (i + 1)),
+          el('div', { class: 'meals' }, (d.meals || []).map(m => el('div', { class: 'meal', dir: 'auto' },
+            el('h4', {}, m.meal || ''),
+            el('ul', {}, (m.items || []).map(it => el('li', {}, it))),
+            m.notes ? el('p', { class: 'hint' }, m.notes) : null)))));
+      });
+      if (p.tips && p.tips.length) {
+        wrap.append(el('div', { class: 'notes' }, el('strong', {}, 'Tips'), el('ul', {}, p.tips.map(t => el('li', {}, t)))));
+      }
+      return wrap;
+    }
+
+    const renderPlan = (type, content, estimate) =>
+      type === 'workout' ? renderWorkout(content || {}) : renderMeal(content || {}, estimate);
+
+    // ---------- generate ----------
+    let historyLoaded = false;
+    const form = document.getElementById('coach-form');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const btn = form.querySelector('button[type=submit]');
+      FW.setBusy(btn, true, 'Coach is preparing your plan…');
+      result.replaceChildren(el('p', { class: 'muted' }, 'Working with the workout and nutrition specialists. This usually takes 20–60 seconds…'));
+      const r = await FW.coach('generate', {
+        plan_type: fd.get('plan_type'),
+        days_per_week: fd.get('days_per_week'),
+        session_minutes: fd.get('session_minutes'),
+        equipment: fd.get('equipment'),
+        include_nutrition: fd.get('include_nutrition') ? 'true' : 'false',
+        notes: fd.get('notes')
+      });
+      FW.setBusy(btn, false);
+      const d = r.data;
+      if (d.code === 'profile_incomplete') {
+        result.replaceChildren(el('div', { class: 'alert alert-warn' }, d.message, ' ', el('a', { href: 'profile.html' }, 'Complete profile →')));
+        return;
+      }
+      if (!d.success) {
+        result.replaceChildren(el('div', { class: 'alert alert-error' }, (d.errors && d.errors.join(' ')) || d.message || 'Something went wrong.'));
+        return;
+      }
+      const parts = [el('div', { class: 'coach-msg', dir: 'auto' }, d.message || 'Here is your plan.')];
+      if (d.saved === false) parts.push(el('div', { class: 'alert alert-warn' }, 'Your plan was generated but could not be saved to your history.'));
+      (d.plans || []).forEach(p => parts.push(renderPlan(p.plan_type, p.content, p.nutrition_estimate)));
+      result.replaceChildren(...parts);
+      historyLoaded = false;
+    });
+
+    // ---------- history ----------
+    const fmtDate = (iso) => { try { return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }); } catch { return iso; } };
+
+    async function loadHistory() {
+      list.replaceChildren(el('p', { class: 'muted' }, 'Loading…'));
+      const r = await FW.coach('history');
+      if (!r.data.success) { list.replaceChildren(el('div', { class: 'alert alert-error' }, r.data.message || 'Could not load your plans.')); return; }
+      const plans = r.data.plans || [];
+      if (!plans.length) { list.replaceChildren(el('p', { class: 'muted' }, 'No saved plans yet. Generate your first one!')); return; }
+      list.replaceChildren(...plans.map(p => {
+        const label = `${p.plan_type === 'workout' ? '🏋️ Workout' : '🥗 Meal'} · ${fmtDate(p.created_at)}${p.content && p.content.title ? ' · ' + p.content.title : ''}`;
+        const det = el('details', { class: 'history-item' }, el('summary', {}, label));
+        det.addEventListener('toggle', () => {
+          if (det.open && !det.dataset.done) {
+            det.append(renderPlan(p.plan_type, p.content, p.nutrition_estimate));
+            if (p.request_notes) det.append(el('p', { class: 'hint', dir: 'auto' }, 'Your notes: ' + p.request_notes));
+            det.dataset.done = '1';
+          }
+        });
+        return det;
+      }));
+      historyLoaded = true;
+    }
+    document.getElementById('reload-history').addEventListener('click', loadHistory);
+
+    document.querySelectorAll('[data-section]').forEach(b => b.addEventListener('click', () => {
+      const s = b.dataset.section;
+      document.getElementById('new-section').hidden = s !== 'new';
+      document.getElementById('history-section').hidden = s !== 'history';
+      document.querySelectorAll('[data-section]').forEach(x => x.classList.toggle('btn-ghost', x !== b));
+      if (s === 'history' && !historyLoaded) loadHistory();
+    }));
+  </script>
+</body>
+</html>
