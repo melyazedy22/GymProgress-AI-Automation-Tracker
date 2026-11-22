@@ -404,14 +404,6 @@ curl.exe -X POST http://localhost:5678/webhook/fitwave-coach -d "action=history"
 
 ---
 
-## Security & known limitations
-
-| Risk | Mitigation |
-|---|---|
-| Secret leakage | API keys stay in n8n credentials; passwords are sent only to Supabase Auth over HTTP nodes. |
-| Cross-user data access | `member_id` is extracted from the verified JWT; all Supabase REST requests forward the member's JWT under RLS. |
-| Prompt injection | Inputs are length-limited and type-validated; free-text fields are wrapped in XML-style tags and marked untrusted; AI tools are read-only (`GET`). |
-| Malformed or unsafe AI output | Enforced via Structured Output Parsers, validated before database insertion, and rendered as plain text nodes in the browser. |
 
 ---
 
