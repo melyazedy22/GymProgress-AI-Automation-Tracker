@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FitWave · Smart gym assistant</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="index.html">Fit<span>Wave</span></a>
+    <span class="muted small">Smart gym assistant</span>
+  </header>
+
+  <main class="container grid-2">
+    <section class="hero">
+      <h1>Train smarter with your <span>AI coach</span></h1>
+      <p class="muted">Create your account, build your fitness profile, and get a weekly workout plan and an Egyptian-friendly meal plan made for you.</p>
+      <ul class="features">
+        <li><strong>Personal profile</strong><span class="muted">Age, body metrics, goal, injuries and diet preference in one place.</span></li>
+        <li><strong>AI workout plans</strong><span class="muted">Built for your days, equipment and experience, and around your injuries.</span></li>
+        <li><strong>Meal plans with local food</strong><span class="muted">Foul, eggs, rice, chicken, lentils… with an optional calorie and macro estimate.</span></li>
+        <li><strong>Saved history</strong><span class="muted">Every plan is saved so you can come back to it.</span></li>
+      </ul>
+    </section>
+
+    <section class="card" aria-label="Account">
+      <div class="tabs" role="tablist">
+        <button class="tab active" type="button" data-tab="login" role="tab">Log in</button>
+        <button class="tab" type="button" data-tab="register" role="tab">Create account</button>
+      </div>
+
+      <div id="auth-msg" class="alert" hidden></div>
+
+      <form id="login-panel" class="tab-panel">
+        <div class="field">
+          <label for="login-email">Email</label>
+          <input id="login-email" name="email" type="email" autocomplete="email" required maxlength="254">
+        </div>
+        <div class="field">
+          <label for="login-password">Password</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required maxlength="128">
+        </div>
+        <button class="btn btn-block" type="submit">Log in</button>
+      </form>
+
+      <form id="register-panel" class="tab-panel" hidden>
+        <div class="field">
+          <label for="reg-name">Full name</label>
+          <input id="reg-name" name="full_name" type="text" autocomplete="name" required minlength="2" maxlength="100">
+        </div>
+        <div class="field">
+          <label for="reg-email">Email</label>
+          <input id="reg-email" name="email" type="email" autocomplete="email" required maxlength="254">
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="reg-password">Password</label>
+            <input id="reg-password" name="password" type="password" autocomplete="new-password" required minlength="12" maxlength="128">
+          </div>
+          <div class="field">
+            <label for="reg-confirm">Confirm password</label>
+            <input id="reg-confirm" name="confirm" type="password" autocomplete="new-password" required minlength="12" maxlength="128">
+          </div>
+        </div>
+        <p class="hint">At least 12 characters. You get a free 7-day trial.</p>
+        <button class="btn btn-block" type="submit">Create account</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    if (FW.getSession()) location.replace('coach.html');
+
+    const msgBox = document.getElementById('auth-msg');
+    const params = new URLSearchParams(location.search);
+    if (params.has('expired')) FW.showMessage(msgBox, 'Your session ended. Please log in again.', 'warn');
+
+    const tabs = document.querySelectorAll('.tab');
+    function switchTab(name) {
+      tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+      document.querySelectorAll('.tab-panel').forEach(p => { p.hidden = p.id !== name + '-panel'; });
+      FW.showMessage(msgBox, '');
+    }
+    tabs.forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+
+    const ERROR_TEXT = {
+      user_already_exists: 'An account with this email already exists. Try logging in.',
+      email_exists: 'An account with this email already exists. Try logging in.',
+      weak_password: 'This password is too weak. Use a longer password with letters and numbers.',
+      over_email_send_rate_limit: 'Too many sign-up emails were sent. Please wait a few minutes and try again.',
+      email_address_invalid: 'This email address is not accepted.'
+    };
+
+    // Register
+    const regForm = document.getElementById('register-panel');
+    regForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = new FormData(regForm);
+      if (f.get('password') !== f.get('confirm')) { FW.showMessage(msgBox, 'Passwords do not match.', 'error'); return; }
+      const btn = regForm.querySelector('button[type=submit]');
+      FW.setBusy(btn, true, 'Creating account…');
+      const r = await FW.post(FITWAVE_CONFIG.AUTH_PATH, {
+        action: 'register', full_name: f.get('full_name'), email: f.get('email'), password: f.get('password')
+      });
+      FW.setBusy(btn, false);
+      if (r.data.success) {
+        const email = f.get('email');
+        regForm.reset();
+        switchTab('login');
+        document.getElementById('login-email').value = email;
+        FW.showMessage(msgBox, 'Account created! If you received a confirmation email, confirm it first, then log in.', 'ok');
+      } else {
+        const text = (r.data.errors && r.data.errors.length) ? r.data.errors.join(' ')
+          : (ERROR_TEXT[r.data.error_code] || r.data.message || 'Registration failed.');
+        FW.showMessage(msgBox, text, 'error');
+      }
+    });
+
+    // Login
+    const loginForm = document.getElementById('login-panel');
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = new FormData(loginForm);
+      const btn = loginForm.querySelector('button[type=submit]');
+      FW.setBusy(btn, true, 'Signing in…');
+      const r = await FW.post(FITWAVE_CONFIG.AUTH_PATH, { action: 'login', email: f.get('email'), password: f.get('password') });
+      FW.setBusy(btn, false);
+      loginForm.elements.password.value = '';
+      if (!r.data.success) {
+        const text = (r.data.errors && r.data.errors.join(' ')) || r.data.message || 'Login failed.';
+        FW.showMessage(msgBox, text, 'error');
+        return;
+      }
+      if (!r.data.session || !r.data.session.access_token) {
+        FW.showMessage(msgBox, 'Login worked, but no session token came back. Update the "Build Login Response" node in workflow 01.', 'error');
+        return;
+      }
+      FW.saveSession({
+        access_token: r.data.session.access_token,
+        expires_at: r.data.session.expires_at,
+        full_name: r.data.profile && r.data.profile.full_name,
+        email: r.data.profile && r.data.profile.email,
+        profile_complete: r.data.profile_complete,
+        membership: r.data.membership
+      });
+      location.href = r.data.profile_complete ? 'coach.html' : 'profile.html';
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FitWave · AI Coach</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="coach.html">Fit<span>Wave</span></a>
+    <nav class="nav">
+      <span id="topbar-user" class="user-chip"></span>
+      <a href="profile.html" data-nav="profile">Profile</a>
+      <a href="coach.html" data-nav="coach">AI Coach</a>
+      <button id="logout-btn" class="btn btn-ghost" type="button">Log out</button>
+    </nav>
+  </header>
+
+  <main class="container stack">
+    <div class="card banner">
+      <div>
+        <h2>AI Coach</h2>
+        <p class="muted" id="membership"></p>
+      </div>
+      <div class="section-tabs">
+        <button class="btn" type="button" data-section="new">New plan</button>
+        <button class="btn btn-ghost" type="button" data-section="overload">Progressive overload</button>
+        <button class="btn btn-ghost" type="button" data-section="history">My plans</button>
+      </div>
+    </div>
+
+    <div id="page-msg" class="alert" hidden></div>
+
+    <section id="new-section" class="stack">
+      <form id="coach-form" class="card">
+        <h3>What do you need?</h3>
+        <div class="field">
+          <label>Plan type</label>
+          <div class="choice-group">
+            <label class="choice"><input type="radio" name="plan_type" value="both" checked><span>Workout + meals</span></label>
+            <label class="choice"><input type="radio" name="plan_type" value="workout"><span>Workout only</span></label>
+            <label class="choice"><input type="radio" name="plan_type" value="meal"><span>Meals only</span></label>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="days">Training days / week</label>
+            <select id="days" name="days_per_week">
+              <option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="minutes">Session length</label>
+            <select id="minutes" name="session_minutes">
+              <option value="30">30 min</option><option value="45" selected>45 min</option>
+              <option value="60">60 min</option><option value="90">90 min</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="equipment">Equipment</label>
+            <select id="equipment" name="equipment">
+              <option value="full_gym" selected>Full gym</option>
+              <option value="dumbbells">Dumbbells at home</option>
+              <option value="none">No equipment</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label class="check"><input type="checkbox" name="include_nutrition" checked> Include an approximate calorie &amp; macro estimate</label>
+        </div>
+        <div class="field">
+          <label for="notes">Notes for the coach <span class="muted">(optional)</span></label>
+          <textarea id="notes" name="notes" maxlength="500" dir="auto" placeholder="e.g. I train after work, I don't like fish, more focus on legs"></textarea>
+        </div>
+        <button class="btn btn-block" type="submit">Generate my plan</button>
+        <p class="hint">Takes about 20–60 seconds. General guidance only, not medical advice.</p>
+      </form>
+
+      <div id="result" class="card"><p class="muted">Your plan will appear here.</p></div>
+    </section>
+
+    <section id="overload-section" class="stack" hidden>
+      <form id="overload-form" class="card">
+        <h3>Dumbbell biceps progressive overload</h3>
+        <p class="muted small">Log your latest freeweight dumbbell biceps session and recovery metrics to get your next-session target.</p>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="ov-goal-mode">Goal mode</label>
+            <select id="ov-goal-mode" name="goal_mode" required>
+              <option value="gain_weight" selected>Gain weight</option>
+              <option value="lose_weight">Lose weight</option>
+              <option value="maintain_weight">Maintain weight</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ov-goal-focus">Goal focus</label>
+            <select id="ov-goal-focus" name="goal_focus" required></select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="ov-weight">Dumbbell weight (kg)</label>
+            <input id="ov-weight" name="dumbbell_weight_kg" type="number" min="0.5" max="100" step="0.5" placeholder="12.5" required>
+          </div>
+          <div class="field">
+            <label for="ov-sets">Sets (1–10)</label>
+            <input id="ov-sets" name="sets" type="number" min="1" max="10" step="1" value="3" required>
+          </div>
+          <div class="field">
+            <label for="ov-rir">Reps in Reserve (RIR)</label>
+            <select id="ov-rir" name="rir" required>
+              <option value="0">0 — Muscular failure</option>
+              <option value="1">1 — 1 rep left</option>
+              <option value="2" selected>2 — 2 reps left</option>
+              <option value="3">3 — 3 reps left</option>
+              <option value="4">4 — 4 reps left</option>
+              <option value="5">5 — 5+ reps left</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Reps completed per set</label>
+          <div id="ov-reps-grid" class="reps-grid"></div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="ov-cardio-sport">Standalone cardio sport</label>
+            <select id="ov-cardio-sport" name="cardio_sport">
+              <option value="none" selected>None</option>
+              <option value="running">Running</option>
+              <option value="walking">Walking</option>
+              <option value="cycling">Cycling</option>
+              <option value="swimming">Swimming</option>
+              <option value="elliptical">Elliptical</option>
+              <option value="rowing">Rowing</option>
+              <option value="jump_rope">Jump rope</option>
+              <option value="football">Football</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ov-cardio-min">Cardio minutes</label>
+            <input id="ov-cardio-min" name="cardio_minutes" type="number" min="0" max="600" step="1" value="0" required>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="ov-calories">Daily calories (kcal)</label>
+            <input id="ov-calories" name="daily_calories" type="number" min="0" max="10000" step="1" placeholder="2200" required>
+          </div>
+          <div class="field">
+            <label for="ov-sleep">Sleep (hours)</label>
+            <input id="ov-sleep" name="sleep_hours" type="number" min="0" max="24" step="0.5" placeholder="7.5" required>
+          </div>
+          <div class="field">
+            <label for="ov-water">Hydration (liters)</label>
+            <input id="ov-water" name="hydration_liters" type="number" min="0" max="15" step="0.1" placeholder="2.5" required>
+          </div>
+          <div class="field">
+            <label for="ov-stress">Life stress (1–10)</label>
+            <input id="ov-stress" name="life_stress" type="number" min="1" max="10" step="1" value="4" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="ov-meals">Meals summary <span class="muted">(optional)</span></label>
+          <textarea id="ov-meals" name="meals_summary" maxlength="700" dir="auto" placeholder="e.g. Foul & eggs for breakfast, chicken with rice and salad for lunch, Greek yogurt at night"></textarea>
+        </div>
+
+        <button class="btn btn-block" type="submit">Evaluate next session</button>
+        <p class="hint">Evaluates dumbbell freeweight biceps progression and recovery readiness. General guidance only, not medical advice.</p>
+      </form>
+
+      <div id="overload-result" class="card"><p class="muted">Your next-session evaluation will appear here.</p></div>
+    </section>
+
+    <section id="history-section" class="card" hidden>
+      <div class="banner">
+        <h3>Saved plans</h3>
+        <button class="btn btn-ghost" id="reload-history" type="button">Refresh</button>
+      </div>
+      <div id="history-list"><p class="muted">Loading…</p></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    const session = FW.requireSession();
+    FW.renderTopbar('coach');
+    const { el } = FW;
+    const msg = document.getElementById('page-msg');
+    const result = document.getElementById('result');
+    const overloadResult = document.getElementById('overload-result');
+    const list = document.getElementById('history-list');
+    document.getElementById('membership').textContent = FW.membershipText(session.membership);
+
+    if (session.profile_complete === false) {
+      FW.showMessage(msg, el('span', {}, 'Complete your profile first so the coach can personalise your plan. ', el('a', { href: 'profile.html' }, 'Open profile →')), 'warn');
+    }
+
+    // ---------- renderers (AI text is inserted as text only) ----------
+    const stat = (label, value, unit) => el('div', { class: 'stat' }, el('b', {}, value ?? '–'), el('small', {}, unit ? `${label} (${unit})` : label));
+
+    function renderEstimate(e) {
+      return el('div', { class: 'stack' },
+        el('h4', {}, 'Approximate daily nutrition'),
+        el('div', { class: 'stats' },
+          stat('Calories', e.calories_per_day, 'kcal'), stat('Protein', e.protein_g, 'g'),
+          stat('Carbs', e.carbs_g, 'g'), stat('Fat', e.fat_g, 'g')),
+        e.note ? el('p', { class: 'hint' }, e.note) : null);
+    }
+
+    function renderWorkout(p) {
+      const wrap = el('div', { class: 'plan' }, el('h3', {}, '🏋️ ' + (p.title || 'Workout plan')));
+      const meta = [p.days_per_week && `${p.days_per_week} days/week`, p.session_minutes && `${p.session_minutes} min/session`].filter(Boolean).join(' · ');
+      if (meta) wrap.append(el('p', { class: 'muted' }, meta));
+      (p.days || []).forEach((d, i) => {
+        const rows = (d.exercises || []).map(x => el('tr', {},
+          el('td', {}, x.name || ''), el('td', {}, x.sets ?? ''), el('td', {}, x.reps ?? ''),
+          el('td', {}, x.rest_seconds ? x.rest_seconds + 's' : ''), el('td', { class: 'muted' }, x.notes || '')));
+        wrap.append(el('details', { class: 'day', open: i === 0 },
+          el('summary', {}, `${d.day || 'Day ' + (i + 1)}${d.focus ? ' — ' + d.focus : ''}`),
+          d.warm_up ? el('p', {}, el('strong', {}, 'Warm-up: '), d.warm_up) : null,
+          el('div', { class: 'table-wrap' },
+            el('table', {},
+              el('thead', {}, el('tr', {}, ['Exercise', 'Sets', 'Reps', 'Rest', 'Notes'].map(h => el('th', {}, h)))),
+              el('tbody', {}, rows))),
+          d.cool_down ? el('p', {}, el('strong', {}, 'Cool-down: '), d.cool_down) : null));
+      });
+      if (p.progression) wrap.append(el('p', {}, el('strong', {}, 'Progression: '), p.progression));
+      if (p.safety_notes && p.safety_notes.length) {
+        wrap.append(el('div', { class: 'notes' }, el('strong', {}, 'Safety notes'), el('ul', {}, p.safety_notes.map(n => el('li', {}, n)))));
+      }
+      return wrap;
+    }
+
+    function renderMeal(p, est) {
+      const wrap = el('div', { class: 'plan' }, el('h3', {}, '🥗 ' + (p.title || 'Meal plan')));
+      if (est) wrap.append(renderEstimate(est));
+      (p.days || []).forEach((d, i) => {
+        wrap.append(el('details', { class: 'day', open: i === 0 },
+          el('summary', {}, d.day || 'Day ' + (i + 1)),
+          el('div', { class: 'meals' }, (d.meals || []).map(m => el('div', { class: 'meal', dir: 'auto' },
+            el('h4', {}, m.meal || ''),
+            el('ul', {}, (m.items || []).map(it => el('li', {}, it))),
+            m.notes ? el('p', { class: 'hint' }, m.notes) : null)))));
+      });
+      if (p.tips && p.tips.length) {
+        wrap.append(el('div', { class: 'notes' }, el('strong', {}, 'Tips'), el('ul', {}, p.tips.map(t => el('li', {}, t)))));
+      }
+      return wrap;
+    }
+
+    const ACTION_LABELS = {
+      increase_reps: 'Increase reps',
+      increase_weight: 'Increase weight',
+      hold: 'Hold weight & reps',
+      deload: 'Deload / reduce sets',
+      seek_professional_guidance: 'Seek professional guidance'
+    };
+
+    function renderOverload(ev, fullContent) {
+      const wrap = el('div', { class: 'plan stack' });
+      const ns = ev.next_session || {};
+      const rf = ev.recovery_feedback || {};
+      const readiness = (ev.readiness || 'moderate').toLowerCase();
+
+      if (fullContent && fullContent.input_session) {
+        const inp = fullContent.input_session;
+        const loggedReps = Array.isArray(inp.reps_per_set) ? inp.reps_per_set.join(', ') : '';
+        wrap.append(el('p', { class: 'muted small' },
+          `Logged: ${inp.dumbbell_weight_kg} kg · ${inp.sets} sets (${loggedReps}) · RIR ${inp.rir}` +
+          (inp.cardio_minutes > 0 ? ` · Cardio: ${inp.cardio_sport} (${inp.cardio_minutes} min)` : '')
+        ));
+      }
+
+      wrap.append(el('div', { class: 'banner' },
+        el('h3', {}, '💪 ' + (ns.exercise || 'Next Dumbbell Biceps Session')),
+        el('div', { class: 'chips' },
+          el('span', { class: `badge badge-${readiness}` }, `Readiness: ${readiness.toUpperCase()}`),
+          ns.progression_action ? el('span', { class: 'badge badge-action' }, ACTION_LABELS[ns.progression_action] || ns.progression_action) : null
+        )
+      ));
+
+      wrap.append(el('div', { class: 'stats' },
+        stat('Next weight', ns.dumbbell_weight_kg, 'kg'),
+        stat('Target sets', ns.sets, 'sets'),
+        stat('Target reps', Array.isArray(ns.reps_per_set) ? ns.reps_per_set.join(', ') : '–'),
+        stat('Target RIR', ns.rir_target)
+      ));
+
+      if (ns.reason) wrap.append(el('p', { dir: 'auto' }, el('strong', {}, 'Why: '), ns.reason));
+      if (ev.session_assessment) wrap.append(el('p', { dir: 'auto' }, el('strong', {}, 'Session assessment: '), ev.session_assessment));
+
+      if (ns.technique_cues && ns.technique_cues.length) {
+        wrap.append(el('div', { class: 'notes notes-ok' },
+          el('strong', {}, 'Technique cues'),
+          el('ul', {}, ns.technique_cues.map(c => el('li', { dir: 'auto' }, c)))
+        ));
+      }
+
+      wrap.append(el('div', { class: 'stack' },
+        el('h4', {}, 'Recovery & nutrition breakdown'),
+        el('div', { class: 'meals' },
+          ['sleep', 'hydration', 'stress', 'fuel'].map(k => rf[k] ? el('div', { class: 'meal', dir: 'auto' },
+            el('h4', {}, k.charAt(0).toUpperCase() + k.slice(1)),
+            el('p', { class: 'small' }, rf[k])
+          ) : null)
+        ),
+        ev.cardio_assessment ? el('p', { dir: 'auto' }, el('strong', {}, 'Cardio impact: '), ev.cardio_assessment) : null,
+        ev.nutrition_feedback ? el('p', { dir: 'auto' }, el('strong', {}, 'Nutrition feedback: '), ev.nutrition_feedback) : null
+      ));
+
+      if (ev.safety_notes && ev.safety_notes.length) {
+        wrap.append(el('div', { class: 'notes' },
+          el('strong', {}, 'Safety notes'),
+          el('ul', {}, ev.safety_notes.map(n => el('li', { dir: 'auto' }, n)))
+        ));
+      }
+
+      if (ev.data_limitations && ev.data_limitations.length) {
+        wrap.append(el('div', { class: 'hint' },
+          el('strong', {}, 'Limitations: '),
+          ev.data_limitations.join(' · ')
+        ));
+      }
+
+      return wrap;
+    }
+
+    const renderPlan = (type, content, estimate) => {
+      if (type === 'workout') return renderWorkout(content || {});
+      if (type === 'overload') return renderOverload((content && content.evaluation) || content || {}, content);
+      return renderMeal(content || {}, estimate);
+    };
+
+    // ---------- generate ----------
+    let historyLoaded = false;
+    const form = document.getElementById('coach-form');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const btn = form.querySelector('button[type=submit]');
+      FW.setBusy(btn, true, 'Coach is preparing your plan…');
+      result.replaceChildren(el('p', { class: 'muted' }, 'Working with the workout and nutrition specialists. This usually takes 20–60 seconds…'));
+      const r = await FW.coach('generate', {
+        plan_type: fd.get('plan_type'),
+        days_per_week: fd.get('days_per_week'),
+        session_minutes: fd.get('session_minutes'),
+        equipment: fd.get('equipment'),
+        include_nutrition: fd.get('include_nutrition') ? 'true' : 'false',
+        notes: fd.get('notes')
+      });
+      FW.setBusy(btn, false);
+      const d = r.data;
+      if (d.code === 'profile_incomplete') {
+        result.replaceChildren(el('div', { class: 'alert alert-warn' }, d.message, ' ', el('a', { href: 'profile.html' }, 'Complete profile →')));
+        return;
+      }
+      if (!d.success) {
+        result.replaceChildren(el('div', { class: 'alert alert-error' }, (d.errors && d.errors.join(' ')) || d.message || 'Something went wrong.'));
+        return;
+      }
+      const parts = [el('div', { class: 'coach-msg', dir: 'auto' }, d.message || 'Here is your plan.')];
+      if (d.saved === false) parts.push(el('div', { class: 'alert alert-warn' }, 'Your plan was generated but could not be saved to your history.'));
+      (d.plans || []).forEach(p => parts.push(renderPlan(p.plan_type, p.content, p.nutrition_estimate)));
+      result.replaceChildren(...parts);
+      historyLoaded = false;
+    });
+
+    // ---------- progressive overload ----------
+    const GOAL_FOCUSES = {
+      gain_weight: [
+        { value: 'muscle_gain', label: 'Muscle gain' },
+        { value: 'strength', label: 'Strength' }
+      ],
+      lose_weight: [
+        { value: 'fat_loss', label: 'Fat loss' },
+        { value: 'endurance', label: 'Endurance' }
+      ],
+      maintain_weight: [
+        { value: 'maintenance', label: 'Maintenance' }
+      ]
+    };
+
+    const ovGoalMode = document.getElementById('ov-goal-mode');
+    const ovGoalFocus = document.getElementById('ov-goal-focus');
+    const ovSets = document.getElementById('ov-sets');
+    const ovRepsGrid = document.getElementById('ov-reps-grid');
+
+    function syncGoalFocus() {
+      const options = GOAL_FOCUSES[ovGoalMode.value] || [];
+      ovGoalFocus.replaceChildren(...options.map(o => el('option', { value: o.value }, o.label)));
+    }
+    ovGoalMode.addEventListener('change', syncGoalFocus);
+    syncGoalFocus();
+
+    function syncRepInputs() {
+      const count = Math.min(10, Math.max(1, parseInt(ovSets.value, 10) || 1));
+      const existing = Array.from(ovRepsGrid.querySelectorAll('input')).map(i => i.value);
+      ovRepsGrid.replaceChildren(...Array.from({ length: count }, (_, idx) =>
+        el('div', { class: 'rep-item' },
+          el('label', { for: `ov-rep-${idx + 1}`, class: 'small muted' }, `Set ${idx + 1}`),
+          el('input', {
+            id: `ov-rep-${idx + 1}`,
+            type: 'number',
+            min: '1',
+            max: '100',
+            step: '1',
+            value: existing[idx] || '10',
+            required: true
+          })
+        )
+      ));
+    }
+    ovSets.addEventListener('input', syncRepInputs);
+    syncRepInputs();
+
+    const overloadForm = document.getElementById('overload-form');
+    overloadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(overloadForm);
+      const cardioMins = Number(fd.get('cardio_minutes') || 0);
+      const cardioSport = fd.get('cardio_sport') || 'none';
+      if (cardioMins > 0 && cardioSport === 'none') {
+        overloadResult.replaceChildren(el('div', { class: 'alert alert-error' }, 'Choose a cardio sport when cardio minutes are above zero.'));
+        return;
+      }
+
+      const reps = Array.from(ovRepsGrid.querySelectorAll('input')).map(i => i.value.trim()).join(',');
+      const btn = overloadForm.querySelector('button[type=submit]');
+      FW.setBusy(btn, true, 'Evaluating session…');
+      overloadResult.replaceChildren(el('p', { class: 'muted' }, 'Analyzing your dumbbell biceps session and recovery metrics…'));
+
+      const r = await FW.overload({
+        goal_mode: fd.get('goal_mode'),
+        goal_focus: fd.get('goal_focus'),
+        dumbbell_weight_kg: fd.get('dumbbell_weight_kg'),
+        sets: fd.get('sets'),
+        reps,
+        rir: fd.get('rir'),
+        cardio_sport: cardioSport,
+        cardio_minutes: cardioMins,
+        daily_calories: fd.get('daily_calories'),
+        meals_summary: fd.get('meals_summary'),
+        sleep_hours: fd.get('sleep_hours'),
+        hydration_liters: fd.get('hydration_liters'),
+        life_stress: fd.get('life_stress')
+      });
+
+      FW.setBusy(btn, false);
+      const d = r.data;
+      if (d.code === 'profile_not_found' || d.code === 'profile_incomplete') {
+        overloadResult.replaceChildren(el('div', { class: 'alert alert-warn' }, d.message, ' ', el('a', { href: 'profile.html' }, 'Complete profile →')));
+        return;
+      }
+      if (!d.success) {
+        overloadResult.replaceChildren(el('div', { class: 'alert alert-error' }, (d.errors && d.errors.join(' ')) || d.message || 'Something went wrong.'));
+        return;
+      }
+
+      const parts = [el('div', { class: 'coach-msg', dir: 'auto' }, d.message || 'Here is your next-session evaluation.')];
+      if (d.saved === false) parts.push(el('div', { class: 'alert alert-warn' }, 'Your evaluation was generated but could not be saved to your history.'));
+      if (d.result) parts.push(renderOverload(d.result, null));
+      overloadResult.replaceChildren(...parts);
+      historyLoaded = false;
+    });
+
+    // ---------- history ----------
+    const fmtDate = (iso) => { try { return new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }); } catch { return iso; } };
+
+    async function loadHistory() {
+      list.replaceChildren(el('p', { class: 'muted' }, 'Loading…'));
+      const r = await FW.coach('history');
+      if (!r.data.success) { list.replaceChildren(el('div', { class: 'alert alert-error' }, r.data.message || 'Could not load your plans.')); return; }
+      const plans = r.data.plans || [];
+      if (!plans.length) { list.replaceChildren(el('p', { class: 'muted' }, 'No saved plans yet. Generate your first one!')); return; }
+      list.replaceChildren(...plans.map(p => {
+        let label;
+        if (p.plan_type === 'overload') {
+          const ev = (p.content && p.content.evaluation) || {};
+          label = `💪 Overload · ${fmtDate(p.created_at)}${ev.readiness ? ' · Readiness: ' + ev.readiness : ''}`;
+        } else {
+          label = `${p.plan_type === 'workout' ? '🏋️ Workout' : '🥗 Meal'} · ${fmtDate(p.created_at)}${p.content && p.content.title ? ' · ' + p.content.title : ''}`;
+        }
+        const det = el('details', { class: 'history-item' }, el('summary', {}, label));
+        det.addEventListener('toggle', () => {
+          if (det.open && !det.dataset.done) {
+            det.append(renderPlan(p.plan_type, p.content, p.nutrition_estimate));
+            if (p.request_notes) det.append(el('p', { class: 'hint', dir: 'auto' }, 'Your notes: ' + p.request_notes));
+            det.dataset.done = '1';
+          }
+        });
+        return det;
+      }));
+      historyLoaded = true;
+    }
+    document.getElementById('reload-history').addEventListener('click', loadHistory);
+
+    document.querySelectorAll('[data-section]').forEach(b => b.addEventListener('click', () => {
+      const s = b.dataset.section;
+      document.getElementById('new-section').hidden = s !== 'new';
+      document.getElementById('overload-section').hidden = s !== 'overload';
+      document.getElementById('history-section').hidden = s !== 'history';
+      document.querySelectorAll('[data-section]').forEach(x => x.classList.toggle('btn-ghost', x !== b));
+      if (s === 'history' && !historyLoaded) loadHistory();
+    }));
+  </script>
+</body>
+</html>
