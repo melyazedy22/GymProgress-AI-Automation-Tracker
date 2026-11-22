@@ -13,9 +13,9 @@ AI agents built in **n8n** serve as the decision-making and orchestration layer.
 | Member | Name | Role |
 |---|---|---|
 | A | Mahmoud Ramadan | 01-auth-onboarding-agent and backend (database)|
-| B | Mohamed Osama | 02-fitness-coach-agent (front-end)|
+| B | Mohamed Osama | 02-fitness-coach-agent & front-end|
 | C | Mohamed Ashraf | 03-progressive-overload-agent |
-| D | Youssef Tamer | error workflow and documentation (front-end)|
+| D | Youssef Tamer | error workflow and documentation & front-end|
 
 ---
 
