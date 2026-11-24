@@ -1,0 +1,1676 @@
+{
+  "name": "01-auth-onboarding-agent",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        144
+      ],
+      "id": "3eb77dfe-886f-4bcd-afb1-1f8288b96d79",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "members",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "8edb8e51-1323-41fe-adf4-8421e18ba195"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        -48
+      ],
+      "id": "69e14115-0b89-4205-a3b6-3ef1796f2a73",
+      "name": "Get a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "QgTxh1I3D6WSVzv4",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "fitwave-auth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        32,
+        64
+      ],
+      "id": "b75cbf57-3fa3-4c98-b7d8-0627f4432a39",
+      "name": "Webhook",
+      "webhookId": "57b124fc-09f1-4140-9c8c-31df5d7f0261"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body ?? {};\n\nconst action = typeof body.action === \"string\"\n  ? body.action.trim()\n  : \"\";\n\nconst fullName = typeof body.full_name === \"string\"\n  ? body.full_name.trim()\n  : \"\";\n\nconst email = typeof body.email === \"string\"\n  ? body.email.trim().toLowerCase()\n  : \"\";\n\nconst password = typeof body.password === \"string\"\n  ? body.password\n  : \"\";\n\nconst errors = [];\n\nif (action !== \"register\") {\n  errors.push(\"Invalid action.\");\n}\n\nif (fullName.length < 2 || fullName.length > 100) {\n  errors.push(\"Full name must be between 2 and 100 characters.\");\n}\n\nif (\n  email.length > 254 ||\n  !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)\n) {\n  errors.push(\"A valid email address is required.\");\n}\n\nif (password.length < 12 || password.length > 128) {\n  errors.push(\"Password must be between 12 and 128 characters.\");\n}\n\nreturn [{\n  json: {\n    valid: errors.length === 0,\n    errors,\n    action,\n    full_name: fullName,\n    email\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        -416
+      ],
+      "id": "0ae99055-c158-4479-aeee-3ba748fed497",
+      "name": "Validate Registration"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "f6aa75f3-b618-4b81-aee9-e0e4f7a77b67",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        704,
+        -416
+      ],
+      "id": "3b8125ca-a9d7-4bd7-8086-0fee254925eb",
+      "name": "Registration Valid?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://suhqktpzwmcjzeeriehz.supabase.co/auth/v1/signup",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  email: $json.email,\n  password: $('Webhook').first().json.body.password,\n  data: {\n    full_name: $json.full_name\n  }\n} }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        928,
+        -512
+      ],
+      "id": "46eb2fab-720e-47c2-8a36-313193cf02f8",
+      "name": "Supabase Sign Up",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ONe0NNkc3txurvq9",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  success: $json.statusCode >= 200 && $json.statusCode < 300,\n  message: ($json.statusCode >= 200 && $json.statusCode < 300)\n    ? \"Registration request accepted. Check your email if confirmation is required.\"\n    : \"Registration could not be completed.\",\n  error_code: $json.body?.error_code ?? null\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1152,
+        -512
+      ],
+      "id": "673c040f-878e-4d82-ad47-bafecc445bbf",
+      "name": "Registration Response"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "register",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "e71372a9-9314-4924-b4fb-163e67ba5700"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Register"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "24a15c01-3949-494f-bdb5-7b8353d61f04",
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "login",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Login"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "83a994d8-9d02-4ffc-a662-959ef994f35a",
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "dashboard",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Dashboard"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "5a6a014b-9be1-427a-bbe9-fb4302e0856a",
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "update_profile",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Update Profile"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        256,
+        16
+      ],
+      "id": "e697cddd-0065-4ceb-8d5d-2b82cd6d2551",
+      "name": "Route Action"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"message\": \"Invalid action. Use register or login.\"\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        528,
+        1104
+      ],
+      "id": "5a4dc8fa-054f-4fa6-b78f-5cdcd2420cda",
+      "name": "Invalid Action Response"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body ?? {};\nconst errors = [];\n\nconst email = typeof body.email === \"string\"\n  ? body.email.trim().toLowerCase()\n  : \"\";\n\nconst password = typeof body.password === \"string\"\n  ? body.password\n  : \"\";\n\nif (\n  email.length > 254 ||\n  !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)\n) {\n  errors.push(\"A valid email address is required.\");\n}\n\nif (password.length === 0) {\n  errors.push(\"Password is required.\");\n}\n\nreturn [{\n  json: {\n    valid: errors.length === 0,\n    errors,\n    email\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        -80
+      ],
+      "id": "3f48de4e-bd08-412c-8fcd-fc8e778c177a",
+      "name": "Validate Login"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "bb915462-397d-491a-bed3-68dfe8653842",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        720,
+        -80
+      ],
+      "id": "d479275f-9729-4a38-97cb-a2b3debde8ec",
+      "name": "Login Valid?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  success: false,\n  message: \"Please correct the login data.\",\n  errors: $json.errors\n} }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        928,
+        32
+      ],
+      "id": "8460166d-d1a2-4a77-b426-94265b9b0760",
+      "name": "Invalid Login Data"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  success: $json.valid,\n  message: $json.valid\n    ? \"Registration data is valid. No account has been created yet.\"\n    : \"Please correct the registration data.\",\n  errors: $json.errors\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        928,
+        -336
+      ],
+      "id": "c09a8874-01d8-468b-b57b-34b0d39bdd57",
+      "name": "invalid Registration data"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://suhqktpzwmcjzeeriehz.supabase.co/auth/v1/token?grant_type=password",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  email: $json.email,\n  password: $('Webhook').first().json.body.password\n} }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        928,
+        -144
+      ],
+      "id": "c0f8c6f0-a8d1-4e8c-9d94-577aea7d52e1",
+      "name": "Supabase Login",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ONe0NNkc3txurvq9",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "26ea736f-558a-48d1-aa32-931489da6548",
+              "leftValue": "={{ \n  $json.statusCode === 200 &&\n  typeof $json.body?.access_token === 'string' &&\n  $json.body.access_token.length > 0 &&\n  typeof $json.body?.user?.id === 'string'\n}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1152,
+        -144
+      ],
+      "id": "378693a6-b4bb-4a77-8c72-a76af469ee2f",
+      "name": "Login Successful?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"message\": \"Unable to sign in. Check your email and password, and confirm your email if required.\"\n}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1376,
+        0
+      ],
+      "id": "ac0df97c-5b06-4e9b-9562-7679867e3e56",
+      "name": "Login Failed Response"
+    },
+    {
+      "parameters": {
+        "url": "https://suhqktpzwmcjzeeriehz.supabase.co/rest/v1/members",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "select",
+              "value": "id,email,full_name,age,height_cm,weight_kg,bmi,goal,experience_level,injuries,diet_preference,subscriptions(id,plan_type,start_date,end_date,status)"
+            },
+            {
+              "name": "id",
+              "value": "={{ 'eq.' + $('Supabase Login').first().json.body.user.id }}"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $('Supabase Login').first().json.body.access_token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1376,
+        -240
+      ],
+      "id": "1bf71518-5d64-4b60-8549-f018f33d1749",
+      "name": "Get Member Profile",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ONe0NNkc3txurvq9",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "25e9d3c4-eee6-4702-9e67-acf9de78e970",
+              "leftValue": "={{\n  $json.statusCode === 200 &&\n  Array.isArray($json.body) &&\n  $json.body.length === 1\n}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1600,
+        -240
+      ],
+      "id": "455b56f5-5a34-46f8-a553-626205be6724",
+      "name": "Profile Found?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"message\": \"Unable to load your member profile.\"\n}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1840,
+        -16
+      ],
+      "id": "4e7d3fa5-9cdc-4431-8291-ef73322969ba",
+      "name": "Profile Load Failed"
+    },
+    {
+      "parameters": {
+        "jsCode": "const member = $input.first().json.body[0];\nconst auth = $('Supabase Login').first().json.body;\n\nconst subscriptions = Array.isArray(member.subscriptions)\n  ? member.subscriptions\n  : [];\n\n// Use UTC dates consistently with the current database setup.\n// The end date is exclusive.\nconst today = new Date().toISOString().slice(0, 10);\n\nconst activeSubscription = subscriptions.find((subscription) =>\n  subscription.status === \"active\" &&\n  subscription.start_date <= today &&\n  subscription.end_date > today\n) ?? null;\n\nconst requiredFields = [\n  \"age\",\n  \"height_cm\",\n  \"weight_kg\",\n  \"goal\",\n  \"experience_level\"\n];\n\nconst missingFields = requiredFields.filter((field) =>\n  member[field] === null ||\n  member[field] === undefined ||\n  member[field] === \"\"\n);\n\nconst { subscriptions: subscriptionHistory, ...profile } = member;\n\nreturn [{\n  json: {\n    success: true,\n    message: \"Signed in successfully.\",\n    session: {\n      access_token: auth.access_token,\n      token_type: \"bearer\",\n      expires_at: auth.expires_at\n    },\n    profile,\n    profile_complete: missingFields.length === 0,\n    missing_fields: missingFields,\n    membership: {\n      has_active_subscription: activeSubscription !== null,\n      subscription: activeSubscription\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1824,
+        -336
+      ],
+      "id": "bb0366dd-68c0-4b7c-8b08-ee7587d176a7",
+      "name": "Build Login Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              },
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              },
+              {
+                "name": "Referrer-Policy",
+                "value": "no-referrer"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2272,
+        -336
+      ],
+      "id": "86b35056-24b3-45f9-8018-e4f740ad5897",
+      "name": "Login Response"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body ?? {};\n\nconst accessToken = typeof body.access_token === \"string\"\n  ? body.access_token.trim()\n  : \"\";\n\nreturn [{\n  json: {\n    valid: accessToken.length > 0,\n    access_token: accessToken\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        320
+      ],
+      "id": "f9684667-e300-4aee-bdbf-d1b5e3025946",
+      "name": "Validate Dashboard Request"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "8d5db63c-6342-4327-9833-ca86955ba43e",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        720,
+        320
+      ],
+      "id": "f328c7d0-9ea6-4a3f-bfe1-474e61597579",
+      "name": "Token Provided? "
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"message\": \"Please sign in to continue.\"\n}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1216,
+        576
+      ],
+      "id": "72fa93b5-d868-400d-8149-8762e9edd4bd",
+      "name": "Session Required"
+    },
+    {
+      "parameters": {
+        "url": "https://suhqktpzwmcjzeeriehz.supabase.co/auth/v1/user",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $json.access_token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        928,
+        288
+      ],
+      "id": "774bd943-591b-4b48-80f7-8a944e095e41",
+      "name": "Verify Session",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ONe0NNkc3txurvq9",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "603d8f08-77dd-402f-9a83-8bdd523c2822",
+              "leftValue": "={{\n  $json.statusCode === 200 &&\n  typeof $json.body?.id === 'string' &&\n  $json.body.id.length > 0\n}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1152,
+        304
+      ],
+      "id": "0be92f18-eaa8-47c3-badf-6c8f0c9e92a3",
+      "name": "Session Valid?"
+    },
+    {
+      "parameters": {
+        "url": "https://suhqktpzwmcjzeeriehz.supabase.co/rest/v1/members",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "select",
+              "value": "id,email,full_name,age,height_cm,weight_kg,bmi,goal,experience_level,injuries,diet_preference,subscriptions(id,plan_type,start_date,end_date,status)"
+            },
+            {
+              "name": "id",
+              "value": "={{ 'eq.' + $('Verify Session').first().json.body.id }}"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $('Validate Dashboard Request').first().json.access_token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1392,
+        288
+      ],
+      "id": "1bb3c97f-3968-4fb2-946d-63d9dbe845bc",
+      "name": "Get Dashboard Profile",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ONe0NNkc3txurvq9",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "52830511-f341-47a5-a04e-f04d2aa64fff",
+              "leftValue": "={{\n  $json.statusCode === 200 &&\n  Array.isArray($json.body) &&\n  $json.body.length === 1\n}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1616,
+        272
+      ],
+      "id": "ae9d9f33-95c7-4cba-99a1-97254fb8cd44",
+      "name": "Dashboard Profile Found?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const member = $input.first().json.body[0];\n\nconst subscriptions = Array.isArray(member.subscriptions)\n  ? member.subscriptions\n  : [];\n\n// Use UTC dates consistently with the current database setup.\n// The end date is exclusive.\nconst today = new Date().toISOString().slice(0, 10);\n\nconst activeSubscription = subscriptions.find((subscription) =>\n  subscription.status === \"active\" &&\n  subscription.start_date <= today &&\n  subscription.end_date > today\n) ?? null;\n\nconst requiredFields = [\n  \"age\",\n  \"height_cm\",\n  \"weight_kg\",\n  \"goal\",\n  \"experience_level\"\n];\n\nconst missingFields = requiredFields.filter((field) =>\n  member[field] === null ||\n  member[field] === undefined ||\n  member[field] === \"\"\n);\n\nconst { subscriptions: subscriptionHistory, ...profile } = member;\n\nreturn [{\n  json: {\n    success: true,\n    message: \"Dashboard loaded successfully.\",\n    profile,\n    profile_complete: missingFields.length === 0,\n    missing_fields: missingFields,\n    membership: {\n      has_active_subscription: activeSubscription !== null,\n      subscription: activeSubscription\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1824,
+        256
+      ],
+      "id": "09c72bda-bd6b-41c1-93b0-a96da6a444ae",
+      "name": "Build Dashboard Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              },
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              },
+              {
+                "name": "Referrer-Policy",
+                "value": "no-referrer"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2192,
+        256
+      ],
+      "id": "b5e7090c-d3b6-4b24-8944-72bb21c25b72",
+      "name": "Dashboard Response"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body ?? {};\n\nconst accessToken = typeof body.access_token === \"string\"\n  ? body.access_token.trim()\n  : \"\";\n\nreturn [{\n  json: {\n    valid: accessToken.length > 0,\n    access_token: accessToken\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        784
+      ],
+      "id": "a4f0d2b4-9527-4c7c-b028-a15b1753f5a2",
+      "name": "Validate Profile Request"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "14d8edd1-d210-4ba5-af76-c32a18a786bb",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        768,
+        784
+      ],
+      "id": "861bb7f7-ea30-4129-9d1a-8551471ef51d",
+      "name": "Profile Token Provided?"
+    },
+    {
+      "parameters": {
+        "url": "https://suhqktpzwmcjzeeriehz.supabase.co/auth/v1/user",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $json.access_token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        992,
+        768
+      ],
+      "id": "aca2bbb1-4398-42a3-b419-b6da462cbe91",
+      "name": "Verify Profile Session",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ONe0NNkc3txurvq9",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "7778cc6f-f53e-4472-a426-ef750e7f118c",
+              "leftValue": "={{\n  $json.statusCode === 200 &&\n  typeof $json.body?.id === 'string' &&\n  $json.body.id.length > 0\n}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1216,
+        768
+      ],
+      "id": "081a3a5d-7390-4186-8096-1539c20a6a28",
+      "name": "Profile Session Valid?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Webhook').first().json.body ?? {};\nconst userId = $('Verify Profile Session').first().json.body.id;\n\nconst errors = [];\nconst updates = {};\n\nconst hasField = (field) =>\n  Object.prototype.hasOwnProperty.call(body, field);\n\nfunction validateNumber(field, min, max, integer = false) {\n  if (!hasField(field)) return;\n\n  const raw = body[field];\n\n  if (\n    (typeof raw !== \"number\" && typeof raw !== \"string\") ||\n    (typeof raw === \"string\" && raw.trim() === \"\")\n  ) {\n    errors.push(`${field} must be a number.`);\n    return;\n  }\n\n  const value = Number(raw);\n\n  if (\n    !Number.isFinite(value) ||\n    value < min ||\n    value > max ||\n    (integer && !Number.isInteger(value))\n  ) {\n    errors.push(\n      `${field} must be ${integer ? \"an integer\" : \"a number\"} between ${min} and ${max}.`\n    );\n    return;\n  }\n\n  updates[field] = value;\n}\n\nfunction validateChoice(field, allowedValues) {\n  if (!hasField(field)) return;\n\n  const value = typeof body[field] === \"string\"\n    ? body[field].trim()\n    : \"\";\n\n  if (!allowedValues.includes(value)) {\n    errors.push(`${field} contains an invalid value.`);\n    return;\n  }\n\n  updates[field] = value;\n}\n\nfunction validateOptionalText(field, maxLength) {\n  if (!hasField(field)) return;\n\n  if (body[field] === null) {\n    updates[field] = null;\n    return;\n  }\n\n  if (typeof body[field] !== \"string\") {\n    errors.push(`${field} must be text or null.`);\n    return;\n  }\n\n  const value = body[field].trim();\n\n  if (value.length > maxLength) {\n    errors.push(`${field} must not exceed ${maxLength} characters.`);\n    return;\n  }\n\n  updates[field] = value === \"\" ? null : value;\n}\n\nvalidateNumber(\"age\", 12, 90, true);\nvalidateNumber(\"height_cm\", 120, 230);\nvalidateNumber(\"weight_kg\", 30, 250);\n\nvalidateChoice(\"goal\", [\n  \"fat_loss\",\n  \"muscle_gain\",\n  \"strength\",\n  \"endurance\",\n  \"general_fitness\"\n]);\n\nvalidateChoice(\"experience_level\", [\n  \"beginner\",\n  \"intermediate\",\n  \"advanced\"\n]);\n\nvalidateOptionalText(\"injuries\", 2000);\nvalidateOptionalText(\"diet_preference\", 1000);\n\nif (Object.keys(updates).length === 0 && errors.length === 0) {\n  errors.push(\"Provide at least one supported profile field to update.\");\n}\n\nreturn [{\n  json: {\n    valid: errors.length === 0,\n    errors,\n    member_id: userId,\n    updates\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        672
+      ],
+      "id": "280e5ed6-6c57-4f4d-95c8-d9af2e51c2d4",
+      "name": "Validate Profile Updates"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "9e9329f5-8b1c-4cd2-ba29-ebad3c8ad43a",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1664,
+        672
+      ],
+      "id": "9ab711ad-acb7-40b0-ac40-8ed6ebdf6a8a",
+      "name": "Profile Updates Valid?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  success: false,\n  message: \"Please correct the profile data.\",\n  errors: $json.errors\n} }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1888,
+        880
+      ],
+      "id": "e16d4be2-2c1a-4770-9b9c-a1ff7e43f463",
+      "name": "Invalid Profile Updates"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "https://suhqktpzwmcjzeeriehz.supabase.co/rest/v1/members",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "={{ 'eq.' + $('Validate Profile Updates').first().json.member_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Validate Profile Updates').first().json.updates }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1888,
+        576
+      ],
+      "id": "f815c00d-d74f-4361-a2ee-180c3109af0d",
+      "name": "Update Member Profile",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "7IOhnEB9Yu2X98Yf",
+          "name": "FitWave Backend API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "dc60ecfe-e682-40e9-9374-fd8adb738ae8",
+              "leftValue": "={{\n  $json.statusCode === 200 &&\n  Array.isArray($json.body) &&\n  $json.body.length === 1 &&\n  $json.body[0].id === $('Validate Profile Updates').first().json.member_id\n}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        2112,
+        576
+      ],
+      "id": "eb3c50fd-bc9b-4ba2-8459-17eeba444ef3",
+      "name": "Profile Updated?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  success: true,\n  message: \"Profile updated successfully.\",\n  profile: $json.body[0]\n} }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2336,
+        480
+      ],
+      "id": "645b66ef-3d99-4641-911f-5e2533f8b0a0",
+      "name": "Profile Update Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"success\": false,\n  \"message\": \"Unable to update your profile. Please try again.\"\n}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2336,
+        672
+      ],
+      "id": "a8b6b44a-ef73-4a04-a29e-68410f485ba5",
+      "name": "Profile Update Failed"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst profile = data.profile;\nconst membership = data.membership ?? {};\nconst subscription = membership.subscription;\n\nconst request = $('Webhook').first().json.body ?? {};\nconst token = data.session?.access_token ?? request.access_token;\n\nconst endpoint =\n  \"https://pseudosiphonal-meryl-jealously.ngrok-free.dev/webhook/fitwave-auth\";\n\nif (!profile || typeof token !== \"string\" || !token) {\n  throw new Error(\"Dashboard profile or session is missing.\");\n}\n\nfunction escapeHtml(value) {\n  return String(value ?? \"\").replace(/[&<>\"']/g, (character) => ({\n    \"&\": \"&amp;\",\n    \"<\": \"&lt;\",\n    \">\": \"&gt;\",\n    '\"': \"&quot;\",\n    \"'\": \"&#39;\"\n  }[character]));\n}\n\nfunction options(values, selected) {\n  return '<option value=\"\">Select an option</option>' +\n    values.map(([value, label]) =>\n      `<option value=\"${escapeHtml(value)}\"${\n        value === selected ? \" selected\" : \"\"\n      }>${escapeHtml(label)}</option>`\n    ).join(\"\");\n}\n\nconst goals = [\n  [\"fat_loss\", \"Fat loss\"],\n  [\"muscle_gain\", \"Muscle gain\"],\n  [\"strength\", \"Strength\"],\n  [\"endurance\", \"Endurance\"],\n  [\"general_fitness\", \"General fitness\"]\n];\n\nconst levels = [\n  [\"beginner\", \"Beginner\"],\n  [\"intermediate\", \"Intermediate\"],\n  [\"advanced\", \"Advanced\"]\n];\n\nconst sessionField =\n  `<input type=\"hidden\" name=\"access_token\" value=\"${escapeHtml(token)}\">`;\n\nconst html = `<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <meta name=\"referrer\" content=\"no-referrer\">\n  <title>FitWave | Dashboard</title>\n  <style>\n    * { box-sizing: border-box; }\n    body {\n      margin: 0;\n      background: #0b1220;\n      color: #edf3ff;\n      font-family: Arial, sans-serif;\n      line-height: 1.5;\n    }\n    main {\n      width: min(100% - 32px, 1000px);\n      margin: 0 auto;\n      padding: 40px 0;\n    }\n    header {\n      display: flex;\n      align-items: center;\n      justify-content: space-between;\n      gap: 16px;\n      flex-wrap: wrap;\n    }\n    .brand { color: #65e6b4; font-size: 26px; font-weight: 800; }\n    h1 { font-size: clamp(28px, 5vw, 42px); margin-bottom: 8px; }\n    h2 { margin-top: 0; font-size: 22px; }\n    .muted { color: #aebbd0; }\n    .stats {\n      display: grid;\n      grid-template-columns: repeat(3, 1fr);\n      gap: 16px;\n      margin: 28px 0;\n    }\n    .card {\n      background: #141f32;\n      border: 1px solid #2a3850;\n      padding: 24px;\n      border-radius: 18px;\n      margin-bottom: 20px;\n    }\n    .stats .card { margin: 0; }\n    .value { display: block; font-size: 30px; font-weight: 700; }\n    .badge {\n      display: inline-block;\n      padding: 6px 12px;\n      border-radius: 20px;\n      background: #20394a;\n      color: #a6f3d3;\n    }\n    .grid {\n      display: grid;\n      grid-template-columns: repeat(2, minmax(0, 1fr));\n      gap: 18px;\n    }\n    label { display: block; margin-bottom: 7px; font-weight: 600; }\n    input, select, textarea {\n      width: 100%;\n      padding: 13px;\n      border: 1px solid #3b4b65;\n      border-radius: 10px;\n      background: #0d1626;\n      color: #fff;\n      font: inherit;\n    }\n    textarea { resize: vertical; min-height: 100px; }\n    .wide { grid-column: 1 / -1; }\n    button {\n      border: 0;\n      border-radius: 10px;\n      padding: 13px 20px;\n      background: #65e6b4;\n      color: #09231a;\n      font: inherit;\n      font-weight: 700;\n      cursor: pointer;\n    }\n    button:hover { background: #8aefc8; }\n    input:focus-visible, select:focus-visible,\n    textarea:focus-visible, button:focus-visible {\n      outline: 3px solid #65e6b4;\n      outline-offset: 3px;\n    }\n    .save { margin-top: 24px; }\n    @media (max-width: 600px) {\n      .stats, .grid { grid-template-columns: 1fr; }\n      .wide { grid-column: auto; }\n      .card { padding: 20px; }\n    }\n  </style>\n</head>\n<body>\n  <main>\n    <header>\n      <div class=\"brand\">FitWave</div>\n      <form action=\"${escapeHtml(endpoint)}\" method=\"post\">\n        <input type=\"hidden\" name=\"action\" value=\"dashboard\">\n        ${sessionField}\n        <button type=\"submit\">Refresh dashboard</button>\n      </form>\n    </header>\n\n    <h1>Welcome, ${escapeHtml(profile.full_name)}</h1>\n    <p class=\"muted\">${escapeHtml(profile.email)}</p>\n\n    <div class=\"stats\">\n      <section class=\"card\">\n        <span class=\"muted\">Weight</span>\n        <span class=\"value\">${escapeHtml(profile.weight_kg ?? \"—\")}</span>\n        <span class=\"muted\">kg</span>\n      </section>\n      <section class=\"card\">\n        <span class=\"muted\">Height</span>\n        <span class=\"value\">${escapeHtml(profile.height_cm ?? \"—\")}</span>\n        <span class=\"muted\">cm</span>\n      </section>\n      <section class=\"card\">\n        <span class=\"muted\">BMI</span>\n        <span class=\"value\">${escapeHtml(profile.bmi ?? \"—\")}</span>\n      </section>\n    </div>\n\n    <section class=\"card\">\n      <h2>Your membership</h2>\n      <span class=\"badge\">${\n        membership.has_active_subscription\n          ? \"Active membership\"\n          : \"No active membership\"\n      }</span>\n      ${subscription ? `\n        <p>Plan: <strong>${escapeHtml(subscription.plan_type)}</strong></p>\n        <p class=\"muted\">\n          Starts: ${escapeHtml(subscription.start_date)}<br>\n          Ends on: ${escapeHtml(subscription.end_date)} (exclusive)\n        </p>\n      ` : '<p class=\"muted\">No current subscription is available.</p>'}\n    </section>\n\n    <section class=\"card\">\n      <h2>Your fitness profile</h2>\n      <p class=\"muted\">${\n        data.profile_complete\n          ? \"Your basic profile is complete.\"\n          : \"Complete your basic details below.\"\n      }</p>\n\n      <form action=\"${escapeHtml(endpoint)}\" method=\"post\">\n        <input type=\"hidden\" name=\"action\" value=\"update_profile\">\n        ${sessionField}\n\n        <div class=\"grid\">\n          <div>\n            <label for=\"age\">Age</label>\n            <input id=\"age\" name=\"age\" type=\"number\"\n              min=\"12\" max=\"90\" step=\"1\"\n              value=\"${escapeHtml(profile.age)}\" required>\n          </div>\n\n          <div>\n            <label for=\"height\">Height (cm)</label>\n            <input id=\"height\" name=\"height_cm\" type=\"number\"\n              min=\"120\" max=\"230\" step=\"any\"\n              value=\"${escapeHtml(profile.height_cm)}\" required>\n          </div>\n\n          <div>\n            <label for=\"weight\">Weight (kg)</label>\n            <input id=\"weight\" name=\"weight_kg\" type=\"number\"\n              min=\"30\" max=\"250\" step=\"any\"\n              value=\"${escapeHtml(profile.weight_kg)}\" required>\n          </div>\n\n          <div>\n            <label for=\"goal\">Fitness goal</label>\n            <select id=\"goal\" name=\"goal\" required>\n              ${options(goals, profile.goal)}\n            </select>\n          </div>\n\n          <div class=\"wide\">\n            <label for=\"experience\">Experience level</label>\n            <select id=\"experience\" name=\"experience_level\" required>\n              ${options(levels, profile.experience_level)}\n            </select>\n          </div>\n\n          <div class=\"wide\">\n            <label for=\"injuries\">Injuries or exercise limitations</label>\n            <textarea id=\"injuries\" name=\"injuries\"\n              maxlength=\"2000\">${escapeHtml(profile.injuries)}</textarea>\n          </div>\n\n          <div class=\"wide\">\n            <label for=\"diet\">Diet preferences</label>\n            <textarea id=\"diet\" name=\"diet_preference\"\n              maxlength=\"1000\">${escapeHtml(profile.diet_preference)}</textarea>\n          </div>\n        </div>\n\n        <button class=\"save\" type=\"submit\">Save profile</button>\n      </form>\n    </section>\n\n    <p class=\"muted\">If your session expires, open the sign-in page again.</p>\n  </main>\n</body>\n</html>`;\n\nreturn [{ json: { html } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2048,
+        -336
+      ],
+      "id": "0ee5a08e-5bb4-4272-93c6-07f96439b0a5",
+      "name": "Render Login Dashboard"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst profile = data.profile;\nconst membership = data.membership ?? {};\nconst subscription = membership.subscription;\n\nconst request = $('Webhook').first().json.body ?? {};\nconst token = data.session?.access_token ?? request.access_token;\n\nconst endpoint =\n  \"https://pseudosiphonal-meryl-jealously.ngrok-free.dev/webhook/fitwave-auth\";\n\nif (!profile || typeof token !== \"string\" || !token) {\n  throw new Error(\"Dashboard profile or session is missing.\");\n}\n\nfunction escapeHtml(value) {\n  return String(value ?? \"\").replace(/[&<>\"']/g, (character) => ({\n    \"&\": \"&amp;\",\n    \"<\": \"&lt;\",\n    \">\": \"&gt;\",\n    '\"': \"&quot;\",\n    \"'\": \"&#39;\"\n  }[character]));\n}\n\nfunction options(values, selected) {\n  return '<option value=\"\">Select an option</option>' +\n    values.map(([value, label]) =>\n      `<option value=\"${escapeHtml(value)}\"${\n        value === selected ? \" selected\" : \"\"\n      }>${escapeHtml(label)}</option>`\n    ).join(\"\");\n}\n\nconst goals = [\n  [\"fat_loss\", \"Fat loss\"],\n  [\"muscle_gain\", \"Muscle gain\"],\n  [\"strength\", \"Strength\"],\n  [\"endurance\", \"Endurance\"],\n  [\"general_fitness\", \"General fitness\"]\n];\n\nconst levels = [\n  [\"beginner\", \"Beginner\"],\n  [\"intermediate\", \"Intermediate\"],\n  [\"advanced\", \"Advanced\"]\n];\n\nconst sessionField =\n  `<input type=\"hidden\" name=\"access_token\" value=\"${escapeHtml(token)}\">`;\n\nconst html = `<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <meta name=\"referrer\" content=\"no-referrer\">\n  <title>FitWave | Dashboard</title>\n  <style>\n    * { box-sizing: border-box; }\n    body {\n      margin: 0;\n      background: #0b1220;\n      color: #edf3ff;\n      font-family: Arial, sans-serif;\n      line-height: 1.5;\n    }\n    main {\n      width: min(100% - 32px, 1000px);\n      margin: 0 auto;\n      padding: 40px 0;\n    }\n    header {\n      display: flex;\n      align-items: center;\n      justify-content: space-between;\n      gap: 16px;\n      flex-wrap: wrap;\n    }\n    .brand { color: #65e6b4; font-size: 26px; font-weight: 800; }\n    h1 { font-size: clamp(28px, 5vw, 42px); margin-bottom: 8px; }\n    h2 { margin-top: 0; font-size: 22px; }\n    .muted { color: #aebbd0; }\n    .stats {\n      display: grid;\n      grid-template-columns: repeat(3, 1fr);\n      gap: 16px;\n      margin: 28px 0;\n    }\n    .card {\n      background: #141f32;\n      border: 1px solid #2a3850;\n      padding: 24px;\n      border-radius: 18px;\n      margin-bottom: 20px;\n    }\n    .stats .card { margin: 0; }\n    .value { display: block; font-size: 30px; font-weight: 700; }\n    .badge {\n      display: inline-block;\n      padding: 6px 12px;\n      border-radius: 20px;\n      background: #20394a;\n      color: #a6f3d3;\n    }\n    .grid {\n      display: grid;\n      grid-template-columns: repeat(2, minmax(0, 1fr));\n      gap: 18px;\n    }\n    label { display: block; margin-bottom: 7px; font-weight: 600; }\n    input, select, textarea {\n      width: 100%;\n      padding: 13px;\n      border: 1px solid #3b4b65;\n      border-radius: 10px;\n      background: #0d1626;\n      color: #fff;\n      font: inherit;\n    }\n    textarea { resize: vertical; min-height: 100px; }\n    .wide { grid-column: 1 / -1; }\n    button {\n      border: 0;\n      border-radius: 10px;\n      padding: 13px 20px;\n      background: #65e6b4;\n      color: #09231a;\n      font: inherit;\n      font-weight: 700;\n      cursor: pointer;\n    }\n    button:hover { background: #8aefc8; }\n    input:focus-visible, select:focus-visible,\n    textarea:focus-visible, button:focus-visible {\n      outline: 3px solid #65e6b4;\n      outline-offset: 3px;\n    }\n    .save { margin-top: 24px; }\n    @media (max-width: 600px) {\n      .stats, .grid { grid-template-columns: 1fr; }\n      .wide { grid-column: auto; }\n      .card { padding: 20px; }\n    }\n  </style>\n</head>\n<body>\n  <main>\n    <header>\n      <div class=\"brand\">FitWave</div>\n      <form action=\"${escapeHtml(endpoint)}\" method=\"post\">\n        <input type=\"hidden\" name=\"action\" value=\"dashboard\">\n        ${sessionField}\n        <button type=\"submit\">Refresh dashboard</button>\n      </form>\n    </header>\n\n    <h1>Welcome, ${escapeHtml(profile.full_name)}</h1>\n    <p class=\"muted\">${escapeHtml(profile.email)}</p>\n\n    <div class=\"stats\">\n      <section class=\"card\">\n        <span class=\"muted\">Weight</span>\n        <span class=\"value\">${escapeHtml(profile.weight_kg ?? \"—\")}</span>\n        <span class=\"muted\">kg</span>\n      </section>\n      <section class=\"card\">\n        <span class=\"muted\">Height</span>\n        <span class=\"value\">${escapeHtml(profile.height_cm ?? \"—\")}</span>\n        <span class=\"muted\">cm</span>\n      </section>\n      <section class=\"card\">\n        <span class=\"muted\">BMI</span>\n        <span class=\"value\">${escapeHtml(profile.bmi ?? \"—\")}</span>\n      </section>\n    </div>\n\n    <section class=\"card\">\n      <h2>Your membership</h2>\n      <span class=\"badge\">${\n        membership.has_active_subscription\n          ? \"Active membership\"\n          : \"No active membership\"\n      }</span>\n      ${subscription ? `\n        <p>Plan: <strong>${escapeHtml(subscription.plan_type)}</strong></p>\n        <p class=\"muted\">\n          Starts: ${escapeHtml(subscription.start_date)}<br>\n          Ends on: ${escapeHtml(subscription.end_date)} (exclusive)\n        </p>\n      ` : '<p class=\"muted\">No current subscription is available.</p>'}\n    </section>\n\n    <section class=\"card\">\n      <h2>Your fitness profile</h2>\n      <p class=\"muted\">${\n        data.profile_complete\n          ? \"Your basic profile is complete.\"\n          : \"Complete your basic details below.\"\n      }</p>\n\n      <form action=\"${escapeHtml(endpoint)}\" method=\"post\">\n        <input type=\"hidden\" name=\"action\" value=\"update_profile\">\n        ${sessionField}\n\n        <div class=\"grid\">\n          <div>\n            <label for=\"age\">Age</label>\n            <input id=\"age\" name=\"age\" type=\"number\"\n              min=\"12\" max=\"90\" step=\"1\"\n              value=\"${escapeHtml(profile.age)}\" required>\n          </div>\n\n          <div>\n            <label for=\"height\">Height (cm)</label>\n            <input id=\"height\" name=\"height_cm\" type=\"number\"\n              min=\"120\" max=\"230\" step=\"any\"\n              value=\"${escapeHtml(profile.height_cm)}\" required>\n          </div>\n\n          <div>\n            <label for=\"weight\">Weight (kg)</label>\n            <input id=\"weight\" name=\"weight_kg\" type=\"number\"\n              min=\"30\" max=\"250\" step=\"any\"\n              value=\"${escapeHtml(profile.weight_kg)}\" required>\n          </div>\n\n          <div>\n            <label for=\"goal\">Fitness goal</label>\n            <select id=\"goal\" name=\"goal\" required>\n              ${options(goals, profile.goal)}\n            </select>\n          </div>\n\n          <div class=\"wide\">\n            <label for=\"experience\">Experience level</label>\n            <select id=\"experience\" name=\"experience_level\" required>\n              ${options(levels, profile.experience_level)}\n            </select>\n          </div>\n\n          <div class=\"wide\">\n            <label for=\"injuries\">Injuries or exercise limitations</label>\n            <textarea id=\"injuries\" name=\"injuries\"\n              maxlength=\"2000\">${escapeHtml(profile.injuries)}</textarea>\n          </div>\n\n          <div class=\"wide\">\n            <label for=\"diet\">Diet preferences</label>\n            <textarea id=\"diet\" name=\"diet_preference\"\n              maxlength=\"1000\">${escapeHtml(profile.diet_preference)}</textarea>\n          </div>\n        </div>\n\n        <button class=\"save\" type=\"submit\">Save profile</button>\n      </form>\n    </section>\n\n    <p class=\"muted\">If your session expires, open the sign-in page again.</p>\n  </main>\n</body>\n</html>`;\n\nreturn [{ json: { html } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        256
+      ],
+      "id": "7772189b-c3b2-44ad-a1e0-fde8e846945c",
+      "name": "Render Dashboard"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        []
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Route Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Registration": {
+      "main": [
+        [
+          {
+            "node": "Registration Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registration Valid?": {
+      "main": [
+        [
+          {
+            "node": "Supabase Sign Up",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "invalid Registration data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Sign Up": {
+      "main": [
+        [
+          {
+            "node": "Registration Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Action": {
+      "main": [
+        [
+          {
+            "node": "Validate Registration",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validate Login",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validate Dashboard Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validate Profile Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invalid Action Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Login": {
+      "main": [
+        [
+          {
+            "node": "Login Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Login Valid?": {
+      "main": [
+        [
+          {
+            "node": "Supabase Login",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invalid Login Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "invalid Registration data": {
+      "main": [
+        []
+      ]
+    },
+    "Supabase Login": {
+      "main": [
+        [
+          {
+            "node": "Login Successful?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Login Successful?": {
+      "main": [
+        [
+          {
+            "node": "Get Member Profile",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Login Failed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Member Profile": {
+      "main": [
+        [
+          {
+            "node": "Profile Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Profile Found?": {
+      "main": [
+        [
+          {
+            "node": "Build Login Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Profile Load Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Login Response": {
+      "main": [
+        [
+          {
+            "node": "Render Login Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Dashboard Request": {
+      "main": [
+        [
+          {
+            "node": "Token Provided? ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token Provided? ": {
+      "main": [
+        [
+          {
+            "node": "Verify Session",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Session Required",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Session": {
+      "main": [
+        [
+          {
+            "node": "Session Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session Valid?": {
+      "main": [
+        [
+          {
+            "node": "Get Dashboard Profile",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Session Required",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Dashboard Profile": {
+      "main": [
+        [
+          {
+            "node": "Dashboard Profile Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dashboard Profile Found?": {
+      "main": [
+        [
+          {
+            "node": "Build Dashboard Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Profile Load Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Dashboard Response": {
+      "main": [
+        [
+          {
+            "node": "Render Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Profile Request": {
+      "main": [
+        [
+          {
+            "node": "Profile Token Provided?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Profile Token Provided?": {
+      "main": [
+        [
+          {
+            "node": "Verify Profile Session",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Session Required",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Profile Session": {
+      "main": [
+        [
+          {
+            "node": "Profile Session Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Profile Session Valid?": {
+      "main": [
+        [
+          {
+            "node": "Validate Profile Updates",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Session Required",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Profile Updates": {
+      "main": [
+        [
+          {
+            "node": "Profile Updates Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Profile Updates Valid?": {
+      "main": [
+        [
+          {
+            "node": "Update Member Profile",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invalid Profile Updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Member Profile": {
+      "main": [
+        [
+          {
+            "node": "Profile Updated?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Profile Updated?": {
+      "main": [
+        [
+          {
+            "node": "Profile Update Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Profile Update Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Login Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Login Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Dashboard Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveExecutionProgress": false,
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "47aa5e23-c942-4c1a-a919-f490ddde1685",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9b5aceff28376659058994bbd4fd16747c416a686d24b7ce329fb7391714fd57"
+  },
+  "nodeGroups": [],
+  "id": "kjx4HTGlEvIX1aDc",
+  "tags": []
+}
